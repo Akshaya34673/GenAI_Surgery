@@ -1,0 +1,8 @@
+flask
+pymongo
+authlib
+flask-cors
+flask-mail
+pyjwt
+twilio
+werkzeug
