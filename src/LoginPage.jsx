@@ -1,3 +1,4 @@
+// src/LoginPage.jsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const { setUser } = useAuth();
   const navigate = useNavigate();
-  const toast = useToast(); // Updated: No destructuring, assuming it returns the Sonner toast function
+  const toast = useToast();
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
@@ -37,14 +38,14 @@ const LoginPage = () => {
       if (res.ok) {
         localStorage.setItem('token', data.token);
         setUser(data.user);
-        toast.success("Logged in successfully!"); // Updated to Sonner syntax
+        toast.success("Logged in successfully!");
         navigate('/');
       } else {
-        toast.error(data.error || "Login failed"); // Updated to Sonner syntax
+        toast.error(data.error || "Login failed");
       }
     } catch (err) {
       console.error('Login error:', err);
-      toast.error("An error occurred during login."); // Updated to Sonner syntax
+      toast.error("An error occurred during login.");
     } finally {
       setLoading(false);
     }
@@ -64,14 +65,14 @@ const LoginPage = () => {
       });
       if (res.ok) {
         setIsOtpSent(true);
-        toast.success("OTP sent!"); // Updated to Sonner syntax
+        toast.success("OTP sent!");
       } else {
         const data = await res.json();
-        toast.error(data.error || "Failed to send OTP"); // Updated to Sonner syntax
+        toast.error(data.error || "Failed to send OTP");
       }
     } catch (err) {
       console.error('OTP send error:', err);
-      toast.error("An error occurred while sending OTP."); // Updated to Sonner syntax
+      toast.error("An error occurred while sending OTP.");
     } finally {
       setLoading(false);
     }
@@ -93,21 +94,21 @@ const LoginPage = () => {
       if (res.ok) {
         localStorage.setItem('token', data.token);
         setUser(data.user);
-        toast.success("Verified successfully!"); // Updated to Sonner syntax
+        toast.success("Verified successfully!");
         navigate('/');
       } else {
-        toast.error(data.error || "Invalid OTP"); // Updated to Sonner syntax
+        toast.error(data.error || "Invalid OTP");
       }
     } catch (err) {
       console.error('OTP verify error:', err);
-      toast.error("An error occurred during verification."); // Updated to Sonner syntax
+      toast.error("An error occurred during verification.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleForgotPassword = async () => {
-    if (!email) return toast.error("Enter your email first."); // Updated to Sonner syntax
+    if (!email) return toast.error("Enter your email first.");
     setLoading(true);
     try {
       const res = await fetch('http://localhost:5000/auth/forgot-password', {
@@ -119,10 +120,10 @@ const LoginPage = () => {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      toast.success(data.message); // Updated to Sonner syntax
+      toast.success(data.message);
     } catch (err) {
       console.error('Forgot password error:', err);
-      toast.error("An error occurred while sending reset link."); // Updated to Sonner syntax
+      toast.error("An error occurred while sending reset link.");
     } finally {
       setLoading(false);
     }
@@ -134,17 +135,84 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen pt-20 pb-12 bg-medical-light/20">
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        .fade-in {
+          animation: fadeIn 0.5s ease-out;
+        }
+
+        .slide-up {
+          animation: slideUp 0.6s ease-out;
+        }
+
+        .scale-in {
+          animation: scaleIn 0.4s ease-out;
+        }
+
+        .transition-smooth {
+          transition: all 0.3s ease-in-out;
+        }
+
+        .input-focus {
+          transition: all 0.3s ease-in-out;
+        }
+
+        .input-focus:focus {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+
+        .hover-lift:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .icon-container {
+          transition: transform 0.3s ease-in-out;
+        }
+
+        .icon-container:hover {
+          transform: scale(1.1);
+        }
+      `}</style>
+
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-md mx-auto">
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
+          <div className="text-center mb-8 slide-up">
+            <div className="flex justify-center mb-4 icon-container">
               <Stethoscope className="h-12 w-12 text-medical" />
             </div>
             <h1 className="text-3xl font-bold text-medical-text mb-2">Welcome Back</h1>
             <p className="text-medical-text-light">Sign in to access your surgical AI dashboard</p>
           </div>
 
-          <Card className="medical-card border-0">
+          <Card className="medical-card border-0 scale-in hover-lift transition-smooth">
             <CardHeader className="space-y-1 pb-6">
               <CardTitle className="text-2xl font-semibold text-center text-medical-text">
                 Sign In
@@ -154,30 +222,30 @@ const LoginPage = () => {
               <form onSubmit={isOtpLogin ? (isOtpSent ? handleVerifyOtp : handleSendOtp) : handleEmailLogin} className="space-y-4">
                 {!isOtpLogin ? (
                   <>
-                    <div className="space-y-2">
+                    <div className="space-y-2 fade-in">
                       <Label htmlFor="email" className="text-medical-text font-medium">Email</Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-medical-text-light" />
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-medical-text-light transition-smooth" />
                         <Input 
                           id="email" 
                           type="email" 
                           placeholder="Enter your email" 
-                          className="pl-10 border-medical-light focus:border-medical"
+                          className="pl-10 border-medical-light focus:border-medical input-focus"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required
                         />
                       </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 fade-in" style={{ animationDelay: '0.1s' }}>
                       <Label htmlFor="password" className="text-medical-text font-medium">Password</Label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-medical-text-light" />
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-medical-text-light transition-smooth" />
                         <Input 
                           id="password" 
                           type="password" 
                           placeholder="Enter your password" 
-                          className="pl-10 border-medical-light focus:border-medical"
+                          className="pl-10 border-medical-light focus:border-medical input-focus"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           required
@@ -187,7 +255,7 @@ const LoginPage = () => {
                     <Button 
                       type="button" 
                       variant="link"
-                      className="text-medical hover:text-medical/80 p-0"
+                      className="text-medical hover:text-medical/80 p-0 transition-smooth"
                       onClick={handleForgotPassword}
                     >
                       Forgot password?
@@ -195,15 +263,15 @@ const LoginPage = () => {
                   </>
                 ) : (
                   <>
-                    <div className="space-y-2">
+                    <div className="space-y-2 fade-in">
                       <Label htmlFor="phone" className="text-medical-text font-medium">Phone Number</Label>
                       <div className="relative">
-                        <Phone className="absolute left-3 top-3 h-4 w-4 text-medical-text-light" />
+                        <Phone className="absolute left-3 top-3 h-4 w-4 text-medical-text-light transition-smooth" />
                         <Input 
                           id="phone" 
                           type="tel" 
                           placeholder="Enter your phone number" 
-                          className="pl-10 border-medical-light focus:border-medical"
+                          className="pl-10 border-medical-light focus:border-medical input-focus"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           required
@@ -211,13 +279,13 @@ const LoginPage = () => {
                       </div>
                     </div>
                     {isOtpSent && (
-                      <div className="space-y-2">
+                      <div className="space-y-2 scale-in">
                         <Label htmlFor="otp" className="text-medical-text font-medium">OTP Code</Label>
                         <Input 
                           id="otp" 
                           type="text" 
                           placeholder="Enter OTP code" 
-                          className="border-medical-light focus:border-medical"
+                          className="border-medical-light focus:border-medical input-focus"
                           value={otp}
                           onChange={(e) => setOtp(e.target.value)}
                           required
@@ -228,7 +296,7 @@ const LoginPage = () => {
                 )}
                 <Button 
                   type="submit" 
-                  className="w-full bg-medical hover:bg-medical/90 medical-button"
+                  className="w-full bg-medical hover:bg-medical/90 medical-button transition-smooth hover:shadow-lg active:scale-95"
                   disabled={loading}
                 >
                   {loading ? 'Processing...' : (isOtpLogin ? (isOtpSent ? 'Verify OTP' : 'Send OTP') : 'Sign In')}
@@ -239,7 +307,7 @@ const LoginPage = () => {
                 <Button 
                   variant="link"
                   onClick={() => setIsOtpLogin(!isOtpLogin)}
-                  className="text-medical hover:text-medical/80"
+                  className="text-medical hover:text-medical/80 transition-smooth"
                 >
                   {isOtpLogin ? 'Sign in with email' : 'Sign in with phone OTP'}
                 </Button>
@@ -256,7 +324,7 @@ const LoginPage = () => {
 
               <Button 
                 variant="outline" 
-                className="w-full border-medical-light hover:bg-medical-light/50"
+                className="w-full border-medical-light hover:bg-medical-light/50 transition-smooth hover:shadow-lg active:scale-95"
                 onClick={handleGoogleLogin}
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -271,7 +339,7 @@ const LoginPage = () => {
               <div className="text-center">
                 <p className="text-medical-text-light">
                   Don't have an account?{' '}
-                  <Link to="/signup" className="text-medical hover:text-medical/80 font-medium">
+                  <Link to="/signup" className="text-medical hover:text-medical/80 font-medium transition-smooth">
                     Sign up
                   </Link>
                 </p>

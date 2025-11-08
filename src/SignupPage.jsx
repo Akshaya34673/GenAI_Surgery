@@ -18,7 +18,7 @@ const SignupPage = () => {
   const [loading, setLoading] = useState(false);
   const { setUser } = useAuth();
   const navigate = useNavigate();
-  const toast = useToast(); // Updated: No destructuring, assuming Sonner toast function
+  const toast = useToast();
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -33,13 +33,13 @@ const SignupPage = () => {
       if (res.ok) {
         localStorage.setItem('token', data.token);
         setUser(data.user);
-        toast.success('Account created successfully!'); // Updated to Sonner syntax
+        toast.success('Account created successfully!');
         navigate('/');
       } else {
-        toast.error(data.error || 'Signup failed'); // Updated to Sonner syntax
+        toast.error(data.error || 'Signup failed');
       }
     } catch (err) {
-      toast.error('An error occurred during signup.'); // Updated to Sonner syntax
+      toast.error('An error occurred during signup.');
     }
     setLoading(false);
   };
@@ -50,17 +50,84 @@ const SignupPage = () => {
 
   return (
     <div className="min-h-screen pt-20 pb-12 bg-medical-light/20">
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        .fade-in {
+          animation: fadeIn 0.5s ease-out;
+        }
+
+        .slide-up {
+          animation: slideUp 0.6s ease-out;
+        }
+
+        .scale-in {
+          animation: scaleIn 0.4s ease-out;
+        }
+
+        .transition-smooth {
+          transition: all 0.3s ease-in-out;
+        }
+
+        .input-focus {
+          transition: all 0.3s ease-in-out;
+        }
+
+        .input-focus:focus {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+
+        .hover-lift:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .icon-container {
+          transition: transform 0.3s ease-in-out;
+        }
+
+        .icon-container:hover {
+          transform: scale(1.1);
+        }
+      `}</style>
+
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-md mx-auto">
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
+          <div className="text-center mb-8 slide-up">
+            <div className="flex justify-center mb-4 icon-container">
               <Stethoscope className="h-12 w-12 text-medical" />
             </div>
             <h1 className="text-3xl font-bold text-medical-text mb-2">Join GenAI Surgical AI</h1>
             <p className="text-medical-text-light">Create your account to get started</p>
           </div>
 
-          <Card className="medical-card border-0">
+          <Card className="medical-card border-0 scale-in hover-lift transition-smooth">
             <CardHeader className="space-y-1 pb-6">
               <CardTitle className="text-2xl font-semibold text-center text-medical-text">
                 Create Account
@@ -68,14 +135,14 @@ const SignupPage = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               <form onSubmit={handleSignup} className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-2 fade-in">
                   <Label htmlFor="name" className="text-medical-text font-medium">Full Name</Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-medical-text-light" />
+                    <User className="absolute left-3 top-3 h-4 w-4 text-medical-text-light transition-smooth" />
                     <Input 
                       id="name" 
                       placeholder="Enter your full name" 
-                      className="pl-10 border-medical-light focus:border-medical"
+                      className="pl-10 border-medical-light focus:border-medical input-focus"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
@@ -83,15 +150,15 @@ const SignupPage = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 fade-in" style={{ animationDelay: '0.1s' }}>
                   <Label htmlFor="email" className="text-medical-text font-medium">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-medical-text-light" />
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-medical-text-light transition-smooth" />
                     <Input 
                       id="email" 
                       type="email" 
                       placeholder="Enter your email" 
-                      className="pl-10 border-medical-light focus:border-medical"
+                      className="pl-10 border-medical-light focus:border-medical input-focus"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -99,15 +166,15 @@ const SignupPage = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 fade-in" style={{ animationDelay: '0.2s' }}>
                   <Label htmlFor="password" className="text-medical-text font-medium">Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-medical-text-light" />
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-medical-text-light transition-smooth" />
                     <Input 
                       id="password" 
                       type="password" 
                       placeholder="Create a password" 
-                      className="pl-10 border-medical-light focus:border-medical"
+                      className="pl-10 border-medical-light focus:border-medical input-focus"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -115,15 +182,15 @@ const SignupPage = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 fade-in" style={{ animationDelay: '0.3s' }}>
                   <Label htmlFor="phone" className="text-medical-text font-medium">Phone Number (Optional)</Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-medical-text-light" />
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-medical-text-light transition-smooth" />
                     <Input 
                       id="phone" 
                       type="tel" 
                       placeholder="Enter your phone number" 
-                      className="pl-10 border-medical-light focus:border-medical"
+                      className="pl-10 border-medical-light focus:border-medical input-focus"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                     />
@@ -132,7 +199,7 @@ const SignupPage = () => {
 
                 <Button 
                   type="submit" 
-                  className="w-full bg-medical hover:bg-medical/90 medical-button"
+                  className="w-full bg-medical hover:bg-medical/90 medical-button transition-smooth hover:shadow-lg active:scale-95"
                   disabled={loading}
                 >
                   {loading ? 'Creating...' : 'Create Account'}
@@ -150,7 +217,7 @@ const SignupPage = () => {
 
               <Button 
                 variant="outline" 
-                className="w-full border-medical-light hover:bg-medical-light/50"
+                className="w-full border-medical-light hover:bg-medical-light/50 transition-smooth hover:shadow-lg active:scale-95"
                 onClick={handleGoogleSignup}
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -165,7 +232,7 @@ const SignupPage = () => {
               <div className="text-center">
                 <p className="text-medical-text-light">
                   Already have an account?{' '}
-                  <Link to="/login" className="text-medical hover:text-medical/80 font-medium">
+                  <Link to="/login" className="text-medical hover:text-medical/80 font-medium transition-smooth">
                     Sign in
                   </Link>
                 </p>

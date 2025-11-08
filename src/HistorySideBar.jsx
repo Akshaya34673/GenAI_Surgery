@@ -1,15 +1,15 @@
-// HistorySidebar.jsx
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { X, Film, Trash2 } from 'lucide-react';
+import { X, Film, Image, Trash2, Download } from 'lucide-react';
 
 const HistorySidebar = ({ onClose }) => {
   const [history, setHistory] = useState([]);
-  const toastContext = useToast() || { toast: (args) => console.log('Toast:', args) }; // Fallback
-  const { toast } = toastContext;
+  const [selectedEntry, setSelectedEntry] = useState(null);
+  const { toast } = useToast() || { toast: (args) => console.log('Toast:', args) };
 
+  // ------------------- FETCH HISTORY -------------------
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -22,15 +22,12 @@ const HistorySidebar = ({ onClose }) => {
         'Authorization': `Bearer ${token}`,
         'Origin': 'http://localhost:3000'
       },
-      credentials: 'include' // Ensure credentials are sent
+      credentials: 'include'
     })
       .then(res => res.json())
       .then(data => {
-        if (data.history) {
-          setHistory(data.history);
-        } else {
-          toast({ variant: 'destructive', title: 'Error', description: data.error || 'Failed to load history' });
-        }
+        if (data.history) setHistory(data.history);
+        else toast({ variant: 'destructive', title: 'Error', description: data.error || 'Failed to load history' });
       })
       .catch(err => {
         console.error('History fetch error:', err);
@@ -38,85 +35,364 @@ const HistorySidebar = ({ onClose }) => {
       });
   }, [toast]);
 
-  const handleDelete = async (historyId) => {
+  // ------------------- DELETE -------------------
+  const handleDelete = async (historyId, e) => {
+    e.stopPropagation();
     const token = localStorage.getItem('token');
     try {
       const res = await fetch(`http://localhost:5000/auth/history/${historyId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Origin': 'http://localhost:3000'
-        },
-        credentials: 'include' // Ensure credentials are sent
+        headers: { 'Authorization': `Bearer ${token}`, 'Origin': 'http://localhost:3000' },
+        credentials: 'include'
       });
       const data = await res.json();
       if (res.ok) {
-        setHistory(history.filter(entry => entry._id !== historyId));
+        setHistory(prev => prev.filter(entry => entry._id !== historyId));
         toast({ title: 'Success', description: 'History entry deleted.' });
+        if (selectedEntry?._id === historyId) setSelectedEntry(null);
       } else {
         toast({ variant: 'destructive', title: 'Error', description: data.error || 'Delete failed' });
       }
     } catch (err) {
-      toast({ variant: 'destructive', title: 'Error', description: `Error deleting history: ${err.message}` });
+      toast({ variant: 'destructive', title: 'Error', description: `Error deleting: ${err.message}` });
     }
   };
 
+  // ------------------- PREVIEW RESULT (list) -------------------
+  const renderResultPreview = (result) => {
+    if (!result) return null;
+
+    // Array → detection / atomic actions
+    if (Array.isArray(result)) {
+      return (
+        <div className="mt-2 bg-gray-50 rounded p-2">
+          <p className="text-xs font-semibold text-medical-text mb-1">Detected Items:</p>
+          <ul className="text-xs text-medical-text-light space-y-0.5">
+            {result.slice(0, 3).map((item, i) => (
+              <li key={i}>• {typeof item === 'string' ? item : item.name || JSON.stringify(item)}</li>
+            ))}
+            {result.length > 3 && <li className="text-medical italic">+{result.length - 3} more...</li>}
+          </ul>
+        </div>
+      );
+    }
+
+    // Object → phase/step / combined
+    if (typeof result === 'object' && result.phase) {
+      return (
+        <div className="mt-2 bg-gray-50 rounded p-2">
+          <p className="text-xs font-semibold text-medical-text mb-1">Phase/Step:</p>
+          <ul className="text-xs text-medical-text-light space-y-0.5">
+            <li>• Phase: {result.phase.name || 'N/A'}</li>
+            <li>• Step: {result.step?.name || 'N/A'}</li>
+          </ul>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // ------------------- FULL RESULT (modal) -------------------
+  const renderFullResult = (result) => {
+    if (!result) return <p className="text-sm text-medical-text-light italic">No textual results.</p>;
+
+    if (Array.isArray(result)) {
+      return (
+        <ul className="list-disc pl-5 text-sm text-medical-text-light space-y-1">
+          {result.map((it, i) => <li key={i}>{typeof it === 'string' ? it : it.name || JSON.stringify(it)}</li>)}
+        </ul>
+      );
+    }
+
+    if (typeof result === 'object' && result.phase) {
+      return (
+        <div className="space-y-3">
+          <div>
+            <p className="font-semibold text-medical-text">Phase</p>
+            <p className="text-sm text-medical-text-light">{result.phase.name} – {result.phase.description}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-medical-text">Step</p>
+            <p className="text-sm text-medical-text-light">{result.step?.name || 'N/A'} – {result.step?.description || ''}</p>
+          </div>
+          {result.actions && result.actions.length > 0 && (
+            <div>
+              <p className="font-semibold text-medical-text">Actions</p>
+              <ul className="list-disc pl-5 text-sm text-medical-text-light">
+                {result.actions.map((a, i) => <li key={i}>{a}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // ------------------- RENDER -------------------
   return (
-    <div className="fixed top-20 left-0 h-[calc(100%-5rem)] w-80 bg-background shadow-lg p-4 z-50 overflow-y-auto">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-medical-text">Analysis History</h2>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          <X className="h-5 w-5" />
-        </Button>
-      </div>
-      {history.length === 0 ? (
-        <p className="text-medical-text-light">No history available.</p>
-      ) : (
-        history.map((entry, idx) => (
-          <Card key={idx} className="mb-4">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center">
-                  <Film className="h-5 w-5 text-medical mr-2" />
-                  <p className="font-medium text-medical-text">{entry.model.replace('_', ' ').toUpperCase()}</p>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => handleDelete(entry._id)}
-                  className="text-red-500 hover:text-red-700"
+    <>
+      {/* Overlay */}
+      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+
+      {/* Sidebar */}
+      <div className="fixed top-20 left-0 h-[calc(100vh-5rem)] w-96 bg-white shadow-2xl z-50 flex flex-col">
+        <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 bg-medical/5">
+          <h2 className="text-lg font-semibold text-medical-text">Analysis History</h2>
+          <Button variant="ghost" size="sm" onClick={onClose} className="hover:bg-medical/10">
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3">
+          {history.length === 0 ? (
+            <p className="text-medical-text-light text-center mt-8">No history available.</p>
+          ) : (
+            <div className="space-y-3">
+              {history.map(entry => (
+                <Card
+                  key={entry._id}
+                  className="cursor-pointer hover:shadow-lg transition-all border border-medical-light/30 hover:border-medical"
+                  onClick={() => setSelectedEntry(entry)}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="text-sm text-medical-text-light">Video: {entry.video_path.split('/').pop()}</p>
-              {entry.model === 'instrument_segmentation' ? (
-                <div>
-                  <p className="text-sm text-medical-text-light">Segmented Frames:</p>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    {entry.result.map((frame, frameIdx) => (
-                      <img key={frameIdx} src={`http://localhost:5000/${frame}`} alt={`Frame ${frameIdx}`} className="w-full h-auto" />
-                    ))}
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center flex-1 min-w-0">
+                        {entry.media_type === 'video' ? (
+                          <Film className="h-5 w-5 text-medical mr-2 flex-shrink-0" />
+                        ) : (
+                          <Image className="h-5 w-5 text-medical mr-2 flex-shrink-0" />
+                        )}
+                        <p className="font-semibold text-sm text-medical-text truncate">
+                          {entry.model?.replace('_', ' ').toUpperCase() || 'COMBINED ANALYSIS'}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={e => handleDelete(entry._id, e)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0 flex-shrink-0 ml-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* ----- IMAGE PREVIEW (segmentation) ----- */}
+                    {entry.media_type === 'image' && entry.model === 'instrument_segmentation' && (
+                      <div className="grid grid-cols-2 gap-2 mt-2 mb-2">
+                        {entry.input_path && (
+                          <div>
+                            <p className="text-xs text-medical-text-light mb-1">Input</p>
+                            <img
+                              src={`http://localhost:5000/${entry.input_path}`}
+                              alt="Input"
+                              className="w-full h-24 object-cover rounded border border-medical-light"
+                            />
+                          </div>
+                        )}
+                        {entry.output_path && (
+                          <div>
+                            <p className="text-xs text-medical-text-light mb-1">Output</p>
+                            <img
+                              src={`http://localhost:5000/${entry.output_path}`}
+                              alt="Output"
+                              className="w-full h-24 object-cover rounded border border-medical-light"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ----- SINGLE IMAGE PREVIEW ----- */}
+                    {entry.media_type === 'image' && entry.input_path && entry.model !== 'instrument_segmentation' && (
+                      <div className="mt-2 mb-2">
+                        <img
+                          src={`http://localhost:5000/${entry.input_path}`}
+                          alt="Preview"
+                          className="w-full h-32 object-cover rounded border border-medical-light"
+                        />
+                      </div>
+                    )}
+
+                    {/* ----- VIDEO PREVIEW (input OR output) ----- */}
+                    {entry.media_type === 'video' && (entry.input_path || entry.output_path) && (
+                      <div className="mt-2 mb-2 relative">
+                        <video
+                          className="w-full h-32 object-cover rounded border border-medical-light bg-black"
+                          preload="metadata"
+                        >
+                          <source
+                            src={`http://localhost:5000/${entry.output_path || entry.input_path}#t=0.1`}
+                            type="video/mp4"
+                          />
+                        </video>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-black/50 rounded-full p-2">
+                            <Film className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ----- RESULT PREVIEW ----- */}
+                    {renderResultPreview(entry.result)}
+
+                    <p className="text-xs text-medical-text-light mt-2">
+                      {new Date(entry.timestamp).toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ------------------- MODAL ------------------- */}
+      {selectedEntry && (
+        <>
+          <div className="fixed inset-0 bg-black/70 z-[60]" onClick={() => setSelectedEntry(null)} />
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-start z-10">
+                <div className="flex items-center">
+                  {selectedEntry.media_type === 'video' ? (
+                    <Film className="h-6 w-6 text-medical mr-3" />
+                  ) : (
+                    <Image className="h-6 w-6 text-medical mr-3" />
+                  )}
+                  <div>
+                    <h2 className="text-2xl font-semibold text-medical-text">
+                      {selectedEntry.model.replace('_', ' ').toUpperCase()}
+                    </h2>
+                    <p className="text-sm text-medical-text-light mt-1">
+                      {new Date(selectedEntry.timestamp).toLocaleString()}
+                    </p>
                   </div>
                 </div>
-              ) : entry.model === 'atomic_actions' ? (
-                <div>
-                  <p className="text-sm text-medical-text-light">Actions:</p>
-                  <ul className="list-disc pl-5 text-sm text-medical-text-light">
-                    {entry.result.map((action, idx) => (
-                      <li key={idx}>{action}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-sm text-medical-text-light">Results: {entry.result.join(', ')}</p>
-              )}
-              <p className="text-sm text-medical-text-light">Time: {new Date(entry.timestamp).toLocaleString()}</p>
-            </CardContent>
-          </Card>
-        ))
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedEntry(null)}
+                  className="hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              <div className="p-6">
+                {/* Paths */}
+                {selectedEntry.input_path && (
+                  <p className="text-sm font-medium text-medical-text-light mb-2">
+                    <span className="font-semibold">Input:</span> {selectedEntry.input_path.split('/').pop()}
+                  </p>
+                )}
+                {selectedEntry.output_path && selectedEntry.output_path !== selectedEntry.input_path && (
+                  <p className="text-sm font-medium text-medical-text-light mb-4">
+                    <span className="font-semibold">Output:</span> {selectedEntry.output_path.split('/').pop()}
+                  </p>
+                )}
+
+                {/* Images */}
+                {selectedEntry.media_type === 'image' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    {selectedEntry.input_path && (
+                      <div>
+                        <p className="text-sm font-semibold text-medical-text mb-2">Input Image</p>
+                        <img
+                          src={`http://localhost:5000/${selectedEntry.input_path}`}
+                          alt="Input"
+                          className="w-full h-auto rounded-lg border-2 border-medical-light shadow-md"
+                        />
+                      </div>
+                    )}
+                    {selectedEntry.output_path && selectedEntry.output_path !== selectedEntry.input_path && (
+                      <div>
+                        <p className="text-sm font-semibold text-medical-text mb-2">Output Image</p>
+                        <img
+                          src={`http://localhost:5000/${selectedEntry.output_path}`}
+                          alt="Output"
+                          className="w-full h-auto rounded-lg border-2 border-medical-light shadow-md"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Videos – show BOTH when available */}
+                {selectedEntry.media_type === 'video' && (
+                  <div className="space-y-6 mt-4">
+                    {selectedEntry.input_path && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-semibold text-medical-text">Input Video</p>
+                          <a
+                            href={`http://localhost:5000/${selectedEntry.input_path}`}
+                            download
+                            className="text-medical hover:underline flex items-center text-xs"
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Download
+                          </a>
+                        </div>
+                        <video
+                          controls
+                          className="w-full rounded-lg border-2 border-medical-light shadow-md"
+                          preload="metadata"
+                        >
+                          <source src={`http://localhost:5000/${selectedEntry.input_path}`} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    )}
+
+                    {selectedEntry.output_path && selectedEntry.output_path !== selectedEntry.input_path && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-semibold text-medical-text">Annotated Output Video</p>
+                          <a
+                            href={`http://localhost:5000/${selectedEntry.output_path}`}
+                            download
+                            className="text-medical hover:underline flex items-center text-xs"
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Download
+                          </a>
+                        </div>
+                        <video
+                          controls
+                          className="w-full rounded-lg border-2 border-medical-light shadow-md"
+                          preload="metadata"
+                        >
+                          <source src={`http://localhost:5000/${selectedEntry.output_path}`} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Full textual results */}
+                {selectedEntry.result && (
+                  <div className="mt-6 p-4 bg-medical/5 rounded-lg border border-medical-light">
+                    <p className="text-base font-semibold text-medical-text mb-3">Results</p>
+                    {renderFullResult(selectedEntry.result)}
+                  </div>
+                )}
+                {!selectedEntry.result && (
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-sm text-medical-text-light italic">
+                      No textual results available. Visual output is displayed above.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
-    </div>
+    </>
   );
 };
 

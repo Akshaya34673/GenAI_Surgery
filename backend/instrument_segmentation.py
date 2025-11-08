@@ -9,22 +9,20 @@ import numpy as np
 from PIL import Image
 from datetime import datetime
 from werkzeug.utils import secure_filename
-import jwt as pyjwt  # Changed from import jwt
+import jwt as pyjwt
 
 instrument_segmentation_bp = Blueprint('instrument_segmentation', __name__)
 
-# MongoDB setup
+# --- CONFIGURATION ---
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/surgical_ai_db')
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client['surgical_ai_db']
-UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'Uploads/videos')
-SEGMENTATION_FOLDER = os.environ.get('SEGMENTATION_FOLDER', 'Uploads/segmentation')
-ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov'}
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'Uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Model classes
 class CustomBackbone(nn.Module):
     def __init__(self):
         super().__init__()
@@ -117,12 +115,9 @@ class SurgicalMask2Former(nn.Module):
         return {"pred_logits": outputs_class.transpose(0, 1), "pred_masks": outputs_mask}
 
 def process_frame(frame, model, device):
-    """
-    Process a single video frame and return the segmented frame with contours.
-    Adapted from visualize_segmentation_with_borders.
-    """
-    original_size = frame.shape[:2]
-    image_resized = cv2.resize(frame, (512, 512))
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    original_size = frame_rgb.shape[:2]
+    image_resized = cv2.resize(frame_rgb, (512, 512))
     tensor = torch.tensor(image_resized).permute(2, 0, 1).unsqueeze(0).float() / 255.0
     mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
     std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
@@ -140,7 +135,7 @@ def process_frame(frame, model, device):
         else:
             final_mask = np.zeros(pred_masks.shape[1:], dtype=np.float32)
     
-    binary_mask = (cv2.resize(final_mask, original_size[::-1], interpolation=cv2.INTER_NEAREST) > 0.5).astype(np.uint8)
+    binary_mask = (cv2.resize(final_mask, original_size[::-1], interpolation=cv2.INTER_LINEAR) > 0.5).astype(np.uint8)
     overlay_image = frame.copy()
     contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cv2.drawContours(overlay_image, contours, -1, (225, 225, 0), 2)
@@ -149,68 +144,122 @@ def process_frame(frame, model, device):
 def load_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = SurgicalMask2Former(num_classes=2, num_queries=50)
-    model.load_state_dict(torch.load('models/segmentation_weights.pth', map_location=device))
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    ckpt_path = os.path.join(base_dir, 'models', 'segmentation_weights.pth')
+    try:
+        model.load_state_dict(torch.load(ckpt_path, map_location=device))
+        print(f"Segmentation model loaded successfully from {ckpt_path}")
+    except FileNotFoundError:
+        print(f"Error: Segmentation Checkpoint not found at {ckpt_path}")
+    except Exception as e:
+        print(f"Error loading segmentation model: {str(e)}")
     model.eval()
     return model.to(device)
 
-@instrument_segmentation_bp.route('/instrument_segmentation', methods=['POST'])
-def predict_instrument_segmentation():
+
+def get_segmented_image_path(frame_bgr: np.ndarray, model: torch.nn.Module, device: torch.device, output_filename: str):
+    """
+    Processes a single BGR frame, segments instruments, saves the overlay, 
+    and returns the relative path to the saved file.
+    :param frame_bgr: A BGR NumPy array (the frame data).
+    :param model: The loaded SurgicalMask2Former model.
+    :param device: The computation device.
+    :param output_filename: The desired filename for the segmented output image.
+    :return: Relative path to the saved segmented image (e.g., 'Uploads/...')
+    """
+    frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+    original_size = frame_rgb.shape[:2]
+    image_resized = cv2.resize(frame_rgb, (512, 512))
+    
+    # Prepare tensor (use the same normalization as in the original code)
+    tensor = torch.tensor(image_resized).permute(2, 0, 1).unsqueeze(0).float() / 255.0
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+    tensor = ((tensor - mean) / std).to(device)
+    
+    with torch.no_grad():
+        outputs = model(tensor)
+        pred_masks = outputs["pred_masks"][0].sigmoid()
+        probs = outputs["pred_logits"][0].softmax(dim=-1)[:, 1]
+        
+        # Filtering and combining confident masks
+        confident_masks = pred_masks[probs > 0.8]
+        if len(confident_masks) > 0:
+            final_mask, _ = torch.max(confident_masks, dim=0)
+            final_mask = final_mask.cpu().numpy()
+        else:
+            final_mask = np.zeros(pred_masks.shape[1:], dtype=np.float32)
+    
+    # Create the binary mask resized back to original
+    binary_mask = (cv2.resize(final_mask, original_size[::-1], interpolation=cv2.INTER_LINEAR) > 0.5).astype(np.uint8)
+    
+    # Create the overlay
+    overlay_image = frame_bgr.copy()
+    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(overlay_image, contours, -1, (225, 225, 0), 2)
+    
+    # Save the output
+    segmented_path_abs = os.path.join(UPLOAD_FOLDER, output_filename)
+    cv2.imwrite(segmented_path_abs, overlay_image)
+    
+    return f"{UPLOAD_FOLDER}/{output_filename}".replace('\\', '/')
+
+
+@instrument_segmentation_bp.route('/segment_image', methods=['POST', 'OPTIONS'])
+def segment_image():
+    if request.method == 'OPTIONS':
+        return '', 200
+
     auth_header = request.headers.get('Authorization')
     if not auth_header:
         return jsonify({'error': 'Missing token'}), 401
-
     try:
         token = auth_header.split(' ')[1]
-        decoded = pyjwt.decode(token, os.environ.get('JWT_SECRET_KEY'), algorithms=['HS256'])
+        decoded = pyjwt.decode(token, os.environ.get('JWT_SECRET_KEY', 'your_secret_key_here'), algorithms=['HS256'])
         user_id = decoded['user_id']
-    except pyjwt.InvalidTokenError:
+    except Exception:
         return jsonify({'error': 'Invalid token'}), 401
 
-    if 'video' not in request.files:
-        return jsonify({'error': 'No video file provided'}), 400
-
-    file = request.files['video']
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image file provided'}), 400
+    file = request.files['image']
     if file.filename == '' or not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file format'}), 400
+        return jsonify({'error': 'Invalid file format. Please upload an image (png, jpg, jpeg, webp)'}), 400
 
     filename = secure_filename(f"{user_id}_{datetime.utcnow().timestamp()}_{file.filename}")
-    video_path = os.path.join(UPLOAD_FOLDER, filename)
+    image_path = os.path.join(UPLOAD_FOLDER, filename)
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    file.save(video_path)
+    file.save(image_path)
 
-    # Create directory for segmented frames
-    segmentation_dir = os.path.join(SEGMENTATION_FOLDER, filename.rsplit('.', 1)[0])
-    os.makedirs(segmentation_dir, exist_ok=True)
+    try:
+        frame = cv2.imread(image_path)
+        if frame is None:
+            raise ValueError("OpenCV failed to read the image.")
+        model = load_model()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        segmented_frame_bgr = process_frame(frame, model, device)
 
-    # Load model
-    model = load_model()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        base_name, ext = os.path.splitext(filename)
+        segmented_filename = f"{base_name}_segmented.png"
+        segmented_path = os.path.join(UPLOAD_FOLDER, segmented_filename)
+        cv2.imwrite(segmented_path, segmented_frame_bgr)
+    except Exception as e:
+        print(f"Segmentation processing error: {e}")
+        return jsonify({'error': f'Segmentation failed: {str(e)}'}), 500
 
-    # Process video
-    cap = cv2.VideoCapture(video_path)
-    frame_paths = []
-    frame_idx = 0
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        # Process every 10th frame to reduce output size (adjust as needed)
-        if frame_idx % 10 == 0:
-            segmented_frame = process_frame(frame, model, device)
-            frame_path = os.path.join(segmentation_dir, f'frame_{frame_idx}.png')
-            cv2.imwrite(frame_path, segmented_frame)
-            frame_paths.append(frame_path)
-        frame_idx += 1
-    cap.release()
-
-    # Save to history
+    rel_path = f"Uploads/{segmented_filename}"
     history_entry = {
         'user_id': user_id,
-        'video_path': video_path,
+        'input_path': f"Uploads/{filename}",
+        'output_path': rel_path,
+        'media_type': 'image',
         'model': 'instrument_segmentation',
-        'result': frame_paths,
+        'result': None,
         'timestamp': datetime.utcnow()
     }
     db.history.insert_one(history_entry)
 
-    return jsonify({'segmented_frames': frame_paths, 'video_path': video_path})
+    return jsonify({
+        'input_path': f"Uploads/{filename}",
+        'output_path': rel_path
+    })

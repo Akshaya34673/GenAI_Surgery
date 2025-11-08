@@ -1,6 +1,4 @@
-
-// HomePage.jsx
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,9 +18,10 @@ import {
   MessageSquare,
   Star,
   Send,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import heroImage from '@/assets/hero-medical-ai.jpg';
 
 const Home = () => {
@@ -31,14 +30,53 @@ const Home = () => {
     email: '',
     phone: '',
     message: '',
-    rating: 5,
+    rating: 0,
     category: 'contact'
   });
   const [loading, setLoading] = useState(false);
-  const { toast: toastFn } = useToast() || { toast: (args) => {
-    console.error('Toast function unavailable:', args);
-    return null;
-  }};
+  const [isVisible, setIsVisible] = useState({});
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const sectionRefs = useRef({});
+  const heroRef = useRef(null);
+
+  // Mouse parallax effect
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (heroRef.current) {
+        const rect = heroRef.current.getBoundingClientRect();
+        const x = (e.clientX - rect.left - rect.width / 2) / rect.width;
+        const y = (e.clientY - rect.top - rect.height / 2) / rect.height;
+        setMousePosition({ x: x * 15, y: y * 15 });
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  // Intersection Observer for scroll animations
+  useEffect(() => {
+    const observers = {};
+    
+    Object.keys(sectionRefs.current).forEach(key => {
+      const element = sectionRefs.current[key];
+      if (element) {
+        observers[key] = new IntersectionObserver(
+          ([entry]) => {
+            if (entry.isIntersecting) {
+              setIsVisible(prev => ({ ...prev, [key]: true }));
+            }
+          },
+          { threshold: 0.1, rootMargin: '0px 0px -100px 0px' }
+        );
+        observers[key].observe(element);
+      }
+    });
+
+    return () => {
+      Object.values(observers).forEach(observer => observer.disconnect());
+    };
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -53,10 +91,13 @@ const Home = () => {
     e.preventDefault();
     
     if (!feedback.name.trim() || !feedback.email.trim() || !feedback.message.trim()) {
-      toastFn({
-        variant: "destructive",
-        title: "Missing Fields",
+      toast.error("Missing Fields", {
         description: "Please fill in all required fields.",
+        style: {
+          background: 'white',
+          color: 'black',
+          border: '1px solid #e5e7eb'
+        }
       });
       return;
     }
@@ -75,32 +116,45 @@ const Home = () => {
       const data = await response.json();
 
       if (response.ok) {
-        toastFn({
-          title: "Success!",
-          description: data.message || "Thank you for your message! We'll get back to you soon.",
-          className: "border-green-500 bg-green-50 text-green-700",
+        toast.success("Feedback Submitted Successfully!", {
+          description: "Thank you for your feedback! We have received it and will get back to you soon.",
+          duration: 5000,
+          style: {
+            background: 'white',
+            color: 'black',
+            border: '1px solid #e5e7eb'
+          }
         });
-        setFeedback({
-          name: '',
-          email: '',
-          phone: '',
-          message: '',
-          rating: 5,
-          category: 'contact'
-        });
+        
+        setTimeout(() => {
+          setFeedback({
+            name: '',
+            email: '',
+            phone: '',
+            message: '',
+            rating: 5,
+            category: 'contact'
+          });
+        }, 100);
       } else {
-        toastFn({
-          variant: "destructive",
-          title: "Submission Failed",
+        toast.error("Submission Failed", {
           description: data.error || "Please try again later.",
+          style: {
+            background: 'white',
+            color: 'black',
+            border: '1px solid #e5e7eb'
+          }
         });
       }
     } catch (error) {
       console.error('Feedback submission error:', error);
-      toastFn({
-        variant: "destructive",
-        title: "Network Error",
+      toast.error("Network Error", {
         description: "Unable to connect to server. Please check your connection and try again.",
+        style: {
+          background: 'white',
+          color: 'black',
+          border: '1px solid #e5e7eb'
+        }
       });
     } finally {
       setLoading(false);
@@ -109,39 +163,135 @@ const Home = () => {
 
   return (
     <div className="min-h-screen">
+      {/* Custom Keyframe Animations */}
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes kenBurns {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.08);
+          }
+        }
+
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.8;
+          }
+        }
+
+        @keyframes shimmer {
+          0% {
+            background-position: -1000px 0;
+          }
+          100% {
+            background-position: 1000px 0;
+          }
+        }
+
+        .animate-kenBurns {
+          animation: kenBurns 20s ease-in-out infinite;
+        }
+
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
+
+        .animate-shimmer {
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+          background-size: 1000px 100%;
+          animation: shimmer 3s infinite;
+        }
+
+        /* Ripple effect */
+        .ripple {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .ripple::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 0;
+          height: 0;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.3);
+          transform: translate(-50%, -50%);
+          transition: width 0.6s, height 0.6s;
+        }
+
+        .ripple:hover::before {
+          width: 300px;
+          height: 300px;
+        }
+      `}</style>
+
       {/* Hero Section */}
-      <section className="relative pt-24 pb-20 overflow-hidden">
+      <section 
+        ref={heroRef}
+        className="relative pt-24 pb-40 overflow-hidden"
+      >
         <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${heroImage})` }}
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat animate-kenBurns transition-transform duration-300"
+          style={{ 
+            backgroundImage: `url(${heroImage})`,
+            transform: `translate(${mousePosition.x}px, ${mousePosition.y}px)`
+          }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-medical/90 to-medical/70"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/50 to-blue-700/30"></div>
         </div>
         
         <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="max-w-4xl mx-auto">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+            <h1 className="text-4xl pt-14 sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight animate-[fadeInUp_0.8s_ease-out]">
               Precision Surgical Insights with{' '}
-              <span className="text-medical-light">GenAI</span>
+              <span className="text-medical-light animate-[pulse_2s_ease-in-out_infinite]">GenAI</span>
             </h1>
-            <p className="text-xl sm:text-2xl text-white/90 mb-8 leading-relaxed">
+            <p className="text-xl sm:text-2xl text-white/90 mb-8 leading-relaxed animate-[fadeInUp_0.8s_ease-out_0.2s_both]">
               Leveraging advanced GenAI for real-time scene understanding, tool, and organ detection in medical images.
             </p>
-            <Button 
-              asChild 
-              size="lg" 
-              className="hero-button"
-            >
-              <Link to="/demo">Try the Demo</Link>
-            </Button>
+            <div className="animate-[fadeInUp_0.8s_ease-out_0.4s_both]">
+              <Button
+                asChild
+                size="lg"
+                className="bg-gradient-to-r from-gray-200 via-gray-300 to-gray-100 text-medical-text font-semibold hover:from-gray-300 hover:to-gray-400 shadow-md transition-all hover:scale-105 hover:shadow-xl ripple"
+              >
+                <Link to="/Login">Get Started</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
       {/* How Our AI Works */}
-      <section className="py-20 bg-medical-light/30">
+      <section className="py-20 bg-medical-light/30" ref={el => sectionRefs.current['aiWorks'] = el}>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className={`text-center mb-16 transition-all duration-700 ${isVisible['aiWorks'] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <h2 className="text-3xl sm:text-4xl font-bold text-medical-text mb-4">
               How Our AI Works
             </h2>
@@ -151,49 +301,55 @@ const Home = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            <Card className="medical-card transition-all duration-300 border-0">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-medical/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Brain className="h-8 w-8 text-medical" />
-                </div>
-                <h3 className="text-xl font-semibold text-medical-text mb-4">AI Model Training</h3>
-                <p className="text-medical-text-light leading-relaxed">
-                  Our models are trained on diverse surgical datasets, ensuring accurate recognition across various procedures and anatomical structures.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="medical-card transition-all duration-300 border-0">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-medical/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Zap className="h-8 w-8 text-medical" />
-                </div>
-                <h3 className="text-xl font-semibold text-medical-text mb-4">Realtime Processing</h3>
-                <p className="text-medical-text-light leading-relaxed">
-                  Process surgical footage in real-time, providing instant feedback on instrument detection and procedural analysis.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="medical-card transition-all duration-300 border-0">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-medical/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Target className="h-8 w-8 text-medical" />
-                </div>
-                <h3 className="text-xl font-semibold text-medical-text mb-4">Enhanced Accuracy</h3>
-                <p className="text-medical-text-light leading-relaxed">
-                  Achieve over 95% accuracy in tool recognition and anatomical identification, continuously improving with each analysis.
-                </p>
-              </CardContent>
-            </Card>
+            {[
+              { 
+                icon: Brain, 
+                title: 'AI Model Training', 
+                desc: 'Our models are trained on diverse surgical datasets, ensuring accurate recognition across various procedures and anatomical structures.', 
+                delay: '0s' 
+              },
+              { 
+                icon: Zap, 
+                title: 'Realtime Processing', 
+                desc: 'Process surgical footage in real-time, providing instant feedback on instrument detection and procedural analysis.', 
+                delay: '0.2s' 
+              },
+              { 
+                icon: Target, 
+                title: 'Enhanced Accuracy', 
+                desc: 'Achieve over 95% accuracy in tool recognition and anatomical identification, continuously improving with each analysis.', 
+                delay: '0.4s' 
+              }
+            ].map((item, index) => (
+              <Card 
+                key={index}
+                className={`medical-card transition-all duration-700 border-0 hover:shadow-xl hover:-translate-y-3 group relative overflow-hidden ${
+                  isVisible['aiWorks'] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                style={{ transitionDelay: item.delay }}
+              >
+                {/* Shimmer effect on hover */}
+                <div className="absolute inset-0 animate-shimmer opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                
+                <CardContent className="p-8 text-center relative">
+                  <div className="w-16 h-16 bg-medical/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-float group-hover:scale-110 transition-transform duration-300">
+                    <item.icon className="h-8 w-8 text-medical" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-medical-text mb-4">{item.title}</h3>
+                  <p className="text-medical-text-light leading-relaxed">
+                    {item.desc}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Benefits Section */}
-      <section className="py-20">
+      <section className="py-20" ref={el => sectionRefs.current['benefits'] = el}>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className={`text-center mb-16 transition-all duration-700 ${isVisible['benefits'] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <h2 className="text-3xl sm:text-4xl font-bold text-medical-text mb-4">
               Benefits for Surgical Practice
             </h2>
@@ -204,73 +360,80 @@ const Home = () => {
 
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-medical-success/10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Shield className="h-6 w-6 text-medical-success" />
+              {[
+                { 
+                  icon: Shield, 
+                  title: 'Improved Patient Safety', 
+                  desc: 'Real-time monitoring and alerts help prevent complications and ensure optimal patient outcomes during surgery.', 
+                  color: 'medical-success', 
+                  delay: '0s' 
+                },
+                { 
+                  icon: GraduationCap, 
+                  title: 'Enhanced Training & Simulation', 
+                  desc: 'Provide detailed feedback and analysis for medical education and surgical skill development.', 
+                  color: 'medical-accent', 
+                  delay: '0.1s' 
+                },
+                { 
+                  icon: Workflow, 
+                  title: 'Streamlined Workflows', 
+                  desc: 'Automate documentation and analysis, reducing administrative burden and improving efficiency.', 
+                  color: 'medical', 
+                  delay: '0.2s' 
+                },
+                { 
+                  icon: BarChart3, 
+                  title: 'Post-operative Analysis', 
+                  desc: 'Comprehensive surgical review and performance analytics for continuous improvement.', 
+                  color: 'medical-accent', 
+                  delay: '0.3s' 
+                }
+              ].map((item, index) => (
+                <div 
+                  key={index}
+                  className={`flex items-start space-x-4 transition-all duration-700 hover:translate-x-2 ${
+                    isVisible['benefits'] ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'
+                  }`}
+                  style={{ transitionDelay: item.delay }}
+                >
+                  <div className={`w-12 h-12 bg-${item.color}/10 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:scale-110 hover:rotate-6`}>
+                    <item.icon className={`h-6 w-6 text-${item.color}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-medical-text mb-2">{item.title}</h3>
+                    <p className="text-medical-text-light">
+                      {item.desc}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-medical-text mb-2">Improved Patient Safety</h3>
-                  <p className="text-medical-text-light">
-                    Real-time monitoring and alerts help prevent complications and ensure optimal patient outcomes during surgery.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-medical-accent/10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <GraduationCap className="h-6 w-6 text-medical-accent" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-medical-text mb-2">Enhanced Training & Simulation</h3>
-                  <p className="text-medical-text-light">
-                    Provide detailed feedback and analysis for medical education and surgical skill development.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-medical/10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Workflow className="h-6 w-6 text-medical" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-medical-text mb-2">Streamlined Workflows</h3>
-                  <p className="text-medical-text-light">
-                    Automate documentation and analysis, reducing administrative burden and improving efficiency.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-medical-accent/10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <BarChart3 className="h-6 w-6 text-medical-accent" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-medical-text mb-2">Post-operative Analysis</h3>
-                  <p className="text-medical-text-light">
-                    Comprehensive surgical review and performance analytics for continuous improvement.
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
 
-            <Card className="medical-card p-8 border-0">
+            <Card className={`medical-card p-8 border-0 transition-all duration-700 hover:shadow-2xl ${
+              isVisible['benefits'] ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10'
+            }`}>
               <CardContent className="p-0">
                 <h3 className="text-2xl font-bold text-medical-text mb-6 text-center">
                   Surgical Workflow Enhancement
                 </h3>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-medical-light/50 rounded-lg">
-                    <span className="text-medical-text font-medium">Pre-operative Planning</span>
-                    <div className="w-3 h-3 bg-medical-success rounded-full"></div>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-medical-light/50 rounded-lg">
-                    <span className="text-medical-text font-medium">Real-time Analysis</span>
-                    <div className="w-3 h-3 bg-medical-accent rounded-full"></div>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-medical-light/50 rounded-lg">
-                    <span className="text-medical-text font-medium">Post-operative Review</span>
-                    <div className="w-3 h-3 bg-medical rounded-full"></div>
-                  </div>
+                  {[
+                    { label: 'Pre-operative Planning', color: 'medical-success', delay: '0s' },
+                    { label: 'Real-time Analysis', color: 'medical-accent', delay: '0.1s' },
+                    { label: 'Post-operative Review', color: 'medical', delay: '0.2s' }
+                  ].map((item, index) => (
+                    <div 
+                      key={index}
+                      className={`flex items-center justify-between p-4 bg-medical-light/50 rounded-lg transition-all duration-500 hover:bg-medical-light/70 hover:translate-x-2 ${
+                        isVisible['benefits'] ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-5'
+                      }`}
+                      style={{ transitionDelay: item.delay }}
+                    >
+                      <span className="text-medical-text font-medium">{item.label}</span>
+                      <div className={`w-3 h-3 bg-${item.color} rounded-full animate-pulse`}></div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -279,10 +442,10 @@ const Home = () => {
       </section>
 
       {/* Get in Touch Section */}
-      <section className="py-20 bg-medical-light/20">
+      <section className="py-20 bg-medical-light/20" ref={el => sectionRefs.current['contact'] = el}>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl mx-auto">
-            <div className="text-center mb-12">
+            <div className={`text-center mb-12 transition-all duration-700 ${isVisible['contact'] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
               <h2 className="text-3xl sm:text-4xl font-bold text-medical-text mb-4">
                 Get in Touch
               </h2>
@@ -291,7 +454,7 @@ const Home = () => {
               </p>
             </div>
 
-            <div className="mb-6 p-4 bg-medical/5 rounded-lg border border-medical-light/30">
+            <div className={`mb-6 p-4 bg-medical/5 rounded-lg border border-medical-light/30 transition-all duration-700 ${isVisible['contact'] ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
               <Label className="text-sm font-medium text-medical-text mb-2 block">
                 How would you rate your experience so far? (Optional)
               </Label>
@@ -299,7 +462,7 @@ const Home = () => {
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star
                     key={star}
-                    className={`h-6 w-6 cursor-pointer transition-all duration-200 ${
+                    className={`h-6 w-6 cursor-pointer transition-all duration-200 hover:scale-125 ${
                       feedback.rating >= star
                         ? 'text-yellow-400 fill-yellow-400'
                         : 'text-gray-300 hover:text-yellow-400'
@@ -311,7 +474,7 @@ const Home = () => {
               </div>
             </div>
 
-            <Card className="medical-card border-0 shadow-lg">
+            <Card className={`medical-card border-0 shadow-lg transition-all duration-700 hover:shadow-2xl ${isVisible['contact'] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
               <CardContent className="p-8">
                 <form onSubmit={handleSubmitFeedback} className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-6">
@@ -328,7 +491,7 @@ const Home = () => {
                         placeholder="Enter your full name"
                         required
                         disabled={loading}
-                        className="border-medical-light focus:border-medical transition-colors"
+                        className="border-medical-light focus:border-medical transition-all focus:scale-[1.02]"
                       />
                     </div>
                     <div className="space-y-2">
@@ -336,7 +499,7 @@ const Home = () => {
                         Phone (Optional)
                       </Label>
                       <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-medical-text-light" />
+                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-medical-text-light transition-transform duration-300 peer-focus:scale-110" />
                         <Input 
                           id="phone"
                           name="phone"
@@ -345,7 +508,7 @@ const Home = () => {
                           onChange={handleInputChange}
                           placeholder="+1 (555) 123-4567"
                           disabled={loading}
-                          className="pl-10 border-medical-light focus:border-medical transition-colors"
+                          className="pl-10 border-medical-light focus:border-medical transition-all focus:scale-[1.02] peer"
                         />
                       </div>
                     </div>
@@ -356,7 +519,7 @@ const Home = () => {
                       Email Address *
                     </Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-medical-text-light" />
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-medical-text-light transition-transform duration-300 peer-focus:scale-110" />
                       <Input 
                         id="email"
                         name="email"
@@ -366,7 +529,7 @@ const Home = () => {
                         placeholder="your.email@example.com"
                         required
                         disabled={loading}
-                        className="pl-10 border-medical-light focus:border-medical transition-colors"
+                        className="pl-10 border-medical-light focus:border-medical transition-all focus:scale-[1.02] peer"
                       />
                     </div>
                   </div>
@@ -376,7 +539,7 @@ const Home = () => {
                       Message *
                     </Label>
                     <div className="relative">
-                      <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-medical-text-light" />
+                      <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-medical-text-light transition-transform duration-300 peer-focus:scale-110" />
                       <Textarea 
                         id="message"
                         name="message"
@@ -386,7 +549,7 @@ const Home = () => {
                         rows={4}
                         required
                         disabled={loading}
-                        className="pl-10 border-medical-light focus:border-medical resize-none transition-colors"
+                        className="pl-10 border-medical-light focus:border-medical resize-none transition-all focus:scale-[1.02] peer"
                       />
                     </div>
                   </div>
@@ -394,7 +557,7 @@ const Home = () => {
                   <Button 
                     type="submit" 
                     disabled={loading || !feedback.name.trim() || !feedback.email.trim() || !feedback.message.trim()}
-                    className="w-full bg-medical hover:bg-medical/90 disabled:bg-gray-400 disabled:cursor-not-allowed medical-button flex items-center justify-center transition-all"
+                    className="w-full bg-medical hover:bg-medical/90 disabled:bg-gray-400 disabled:cursor-not-allowed medical-button flex items-center justify-center transition-all hover:scale-105 hover:shadow-lg active:scale-95 group"
                   >
                     {loading ? (
                       <>
@@ -403,16 +566,15 @@ const Home = () => {
                       </>
                     ) : (
                       <>
-                        <Send className="h-4 w-4 mr-2" />
+                        <Send className="h-4 w-4 mr-2 transition-transform group-hover:translate-x-1" />
                         Send Message
                       </>
                     )}
                   </Button>
                 </form>
 
-                <p className="mt-6 pt-4 border-t border-medical-light/30 text-xs text-medical-text-light text-center">
-                  * Required fields. Your information is secure and will only be used to respond to your inquiry. 
-                  We respect your privacy and comply with GDPR regulations.
+                <p className="mt-4 pt-2 border-t border-medical-light/30 text-xs text-medical-text-light text-center">
+                  * Required fields. 
                 </p>
               </CardContent>
             </Card>
@@ -421,18 +583,20 @@ const Home = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-medical-text text-white py-12">
+      <footer className="bg-medical-text text-white py-6">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
+          <div className="text-center animate-[fadeInUp_0.8s_ease-out]">
             <p className="text-white/80 mb-4">
               © 2025 GenAI Surgical AI. All rights reserved.
             </p>
             <div className="flex justify-center space-x-6">
-              <Link to="/terms" className="text-white/60 hover:text-white transition-colors">
+              <Link to="/terms" className="text-white/60 hover:text-white transition-all duration-300 hover:scale-110 relative group">
                 Terms of Service
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white group-hover:w-full transition-all duration-300"></span>
               </Link>
-              <Link to="/privacy" className="text-white/60 hover:text-white transition-colors">
+              <Link to="/privacy" className="text-white/60 hover:text-white transition-all duration-300 hover:scale-110 relative group">
                 Privacy Policy
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white group-hover:w-full transition-all duration-300"></span>
               </Link>
             </div>
           </div>

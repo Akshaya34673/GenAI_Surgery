@@ -11,8 +11,8 @@ import DemoPage from "./DemoPage";
 import NotFoundPage from "./NotFoundPage";
 import ResetPassword from "./ResetPassword";
 import ErrorBoundary from "./ErrorBoundary";
-import { Toaster } from "@/components/ui/sonner"; // Import at the top
-import HistorySidebar from "./HistorySidebar";
+import { Toaster } from "sonner";
+import HistorySidebar from "./HistorySideBar";
 
 const queryClient = new QueryClient();
 
@@ -26,7 +26,10 @@ const AppWrapper = () => {
   const [user, setUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const toggleSidebar = () => {
+    console.log('Toggling sidebar, current state:', isSidebarOpen);
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -65,19 +68,38 @@ const AppWrapper = () => {
   return (
     <AuthContext.Provider value={{ user, setUser, logout }}>
       <ErrorBoundary>
-        <Toaster /> {/* Moved to top level for early mounting */}
         <div className="scroll-smooth">
           <Navigation />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
-            <Route path="/demo" element={<DemoPage toggleSidebar={toggleSidebar} />} />
+            <Route 
+              path="/demo" 
+              element={
+                <DemoPage 
+                  toggleSidebar={toggleSidebar} 
+                  isSidebarOpen={isSidebarOpen} 
+                />
+              } 
+            />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
-          {isSidebarOpen && <HistorySidebar onClose={toggleSidebar} />}
+          {isSidebarOpen && <HistorySidebar onClose={() => setIsSidebarOpen(false)} />}
         </div>
+        <Toaster 
+          position="bottom-right"
+          expand={false}
+          duration={5000}
+          toastOptions={{
+            style: {
+              background: 'white',
+              color: 'black',
+              border: '1px solid #e5e7eb'
+            }
+          }}
+        />
       </ErrorBoundary>
     </AuthContext.Provider>
   );
