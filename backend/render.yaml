@@ -1,13 +1,17 @@
 services:
   - type: web
-    name: surgical-backend
+    name: genai-surgery
     env: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300
-    disk:
-      name: data
-      mountPath: /app
-      sizeGB: 1
-    envVars:
-      HF_TOKEN:
-        fromSecret: HF_TOKEN
+    disks:
+      - name: data
+        mountPath: /app
+        sizeGB: 1
+    preDeployCommand: |
+      fallocate -l 1G /app/swapfile
+      chmod 600 /app/swapfile
+      mkswap /app/swapfile
+      swapon /app/swapfile
+      echo "Swap enabled: 1GB"
