@@ -56,31 +56,4 @@ MViT divides an image into small patches and uses **multi-head self-attention** 
 | **Database** | MongoDB Atlas                           |
 | **Auth**     | JWT (JSON Web Tokens)                   |
 
-Surgical-AI/
-│
-├── backend/
-│   ├── app.py                    # Main Flask application
-│   ├── auth.py                   # JWT Authentication routes
-│   ├── instrument_detection.py   # MViT model inference API
-│   ├── instrument_segmentation.py# Segmentation logic
-│   ├── phase_step.py             # Phase/Step prediction
-│   ├── combined_inference.py     # Combines all predictions
-│   ├── mvit_model.py             # MViT model architecture
-│   └── models/                   # Trained .pth model weights
-│
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx               # Main React app wrapper
-│   │   ├── HomePage.jsx          # Landing Page
-│   │   ├── DemoPage.jsx          # Upload & detect page
-│   │   ├── HistorySidebar.jsx    # Displays user upload history
-│   │   ├── LoginPage.jsx         # Login UI
-│   │   ├── SignupPage.jsx        # Signup UI
-│   ├── package.json
-│   └── tailwind.config.js
-│
-├── uploads/                      # Uploaded images/videos
-├── requirements.txt              # Backend dependencies
-├── README.md                     # Documentation
-└── .env                          # Environment variables
-
+<img width="515" height="617" alt="image" src="https://github.com/user-attachments/assets/b08ee06f-853c-46e7-bb85-ef4dc729021e" />
