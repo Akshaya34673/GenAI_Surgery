@@ -57,3 +57,7 @@ MViT divides an image into small patches and uses **multi-head self-attention** 
 | **Auth**     | JWT (JSON Web Tokens)                   |
 
 <img width="515" height="617" alt="image" src="https://github.com/user-attachments/assets/b08ee06f-853c-46e7-bb85-ef4dc729021e" />
+
+Commands to run the project:
+Frontend: npm run dev
+Backend: python app.py
